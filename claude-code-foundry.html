@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Anthropic on Microsoft Foundry</title>
+<!--
+  Single-file interactive brief. Rebuild after edits:
+    ICON_NM=<dir>/node_modules node build-claude-code-foundry.mjs
+  Keep every section's .wrap under ~740px tall so it fits a 1440x900 laptop.
+-->
+<style>
+:root{
+  --paper:#FFFFFF; --paper2:#F5F8FC; --paper3:#EEF3FA;
+  --ink:#0F1B2D; --ink2:#2E3E54; --muted:#63748C; --faint:#8B9AAF;
+  --hair:#E3EAF3; --hair2:#D5DFEC;
+  --brand:#0F6CBD; --brand2:#0A4E8A; --brandL:#EAF2FB;
+  --red:#C4314B;    --redL:#FCF1F3;
+  --amber:#9A5B00;  --amberL:#FDF5E8;
+  --green:#0E700E;  --greenL:#EDF7ED;
+  --purple:#5B2E91; --purpleL:#F4F0FB;
+  --clay:#C6613F;   --clayL:#FBF1EC;
+  --s1:0 1px 2px rgba(16,29,45,.06);
+  --s2:0 1px 3px rgba(16,29,45,.08), 0 12px 30px -16px rgba(16,29,45,.28);
+  --f:'Segoe UI Variable Display','Segoe UI',system-ui,-apple-system,Roboto,sans-serif;
+  --m:'Cascadia Code','Cascadia Mono',Consolas,'SF Mono',monospace;
+  --r:14px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{background:var(--paper);color:var(--ink);font-family:var(--f);-webkit-font-smoothing:antialiased;overflow:hidden}
+.ico{width:1em;height:1em;display:inline-block;vertical-align:-.14em;stroke-width:1.75;flex:none}
+.ico-brand{stroke-width:0}
+
+/* chrome */
+#prog{position:fixed;top:0;left:0;height:3px;width:0;z-index:60;background:linear-gradient(90deg,var(--brand2),var(--brand));transition:width .25s}
+#top{position:fixed;top:0;left:0;right:0;z-index:55;height:58px;display:flex;align-items:center;justify-content:space-between;
+  padding:0 clamp(1.2rem,4vw,3rem);background:rgba(255,255,255,.84);backdrop-filter:blur(14px);border-bottom:1px solid var(--hair)}
+#top .l{display:flex;align-items:center;gap:.6rem;font-size:.8rem;font-weight:600;color:var(--ink2)}
+#top .r{font-size:.7rem;letter-spacing:.14em;text-transform:uppercase;color:var(--faint)}
+#top .r b{color:var(--brand)}
+#rail{position:fixed;right:clamp(.7rem,2vw,1.5rem);top:50%;transform:translateY(-50%);z-index:50;display:flex;flex-direction:column;gap:.62rem}
+#rail button{width:8px;height:8px;border-radius:50%;border:1px solid var(--hair2);background:#fff;cursor:pointer;padding:0;transition:.3s;position:relative}
+#rail button.on{background:var(--brand);border-color:var(--brand);box-shadow:0 0 0 4px rgba(15,108,189,.13)}
+#rail button span{position:absolute;right:18px;top:50%;transform:translateY(-50%);white-space:nowrap;font-size:.66rem;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--muted);background:#fff;border:1px solid var(--hair);padding:.22rem .52rem;border-radius:6px;
+  box-shadow:var(--s1);opacity:0;pointer-events:none;transition:.25s}
+#rail button:hover span{opacity:1}
+
+/* layout */
+#deck{height:100vh;overflow-y:scroll;scroll-snap-type:y mandatory;scroll-behavior:smooth;scrollbar-width:none}
+#deck::-webkit-scrollbar{display:none}
+section{min-height:100vh;scroll-snap-align:start;scroll-snap-stop:always;display:flex;align-items:center;padding:86px clamp(1.2rem,4vw,3rem) 52px}
+section.alt{background:var(--paper2)}
+.wrap{width:100%;max-width:1180px;margin:0 auto}
+
+/* type */
+.eyebrow{display:inline-flex;align-items:center;gap:.5rem;font-size:.7rem;font-weight:700;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--brand);background:var(--brandL);border:1px solid #D6E7F7;padding:.32rem .74rem;border-radius:999px;margin-bottom:1.1rem}
+h1{font-size:clamp(2.6rem,6vw,5rem);line-height:1.02;letter-spacing:-.034em;font-weight:700}
+h1 .wm{color:var(--clay)}
+h2{font-size:clamp(1.45rem,2.6vw,2.25rem);line-height:1.15;letter-spacing:-.024em;font-weight:700;max-width:26ch}
+h2 em{font-style:normal;color:var(--brand)}
+.lede{font-size:clamp(.95rem,1.1vw,1.08rem);color:var(--muted);max-width:74ch;line-height:1.6;margin-top:.85rem}
+.sub{font-size:clamp(1.05rem,1.55vw,1.5rem);color:var(--ink2);max-width:34ch;line-height:1.45;margin-top:1.8rem;font-weight:500;
+  padding-left:1.15rem;border-left:3px solid var(--clay)}
+.kicker{margin-top:1.4rem;font-size:clamp(.98rem,1.3vw,1.18rem);font-weight:600;max-width:64ch;padding-left:1rem;
+  border-left:3px solid var(--brand);line-height:1.45}
+.kicker em{font-style:normal;color:var(--brand)}
+.note{font-size:.78rem;color:var(--faint);margin-top:.95rem;line-height:1.55;max-width:96ch}
+.note .ico{margin-right:.42rem;vertical-align:-.12em;color:var(--muted)}
+.note b{color:var(--ink2)}
+
+/* reveal */
+.r{opacity:0;transform:translateY(18px);transition:opacity .66s cubic-bezier(.2,.7,.2,1),transform .66s cubic-bezier(.2,.7,.2,1)}
+.is-in .r{opacity:1;transform:none}
+.is-in .r[data-d="1"]{transition-delay:.07s}.is-in .r[data-d="2"]{transition-delay:.14s}
+.is-in .r[data-d="3"]{transition-delay:.22s}.is-in .r[data-d="4"]{transition-delay:.3s}
+.is-in .r[data-d="5"]{transition-delay:.38s}.is-in .r[data-d="6"]{transition-delay:.46s}
+
+/* chips */
+.chip{width:44px;height:44px;border-radius:12px;display:grid;place-items:center;font-size:1.26rem;background:var(--brandL);color:var(--brand);border:1px solid #D9E9F8}
+.chip.green{background:var(--greenL);color:var(--green);border-color:#D5EBD5}
+.chip.purple{background:var(--purpleL);color:var(--purple);border-color:#E3D8F2}
+.chip.clay{background:var(--clayL);color:var(--clay);border-color:#F0D9CD}
+
+/* segmented control */
+.seg{display:inline-flex;background:var(--paper3);border:1px solid var(--hair2);border-radius:999px;padding:3px;flex-wrap:wrap}
+.seg button{font:inherit;font-size:.76rem;font-weight:600;padding:.38rem 1rem;border:0;border-radius:999px;background:transparent;
+  color:var(--muted);cursor:pointer;transition:.28s;display:flex;align-items:center;gap:.38rem}
+.seg button.on{background:#fff;color:var(--brand);box-shadow:var(--s1)}
+
+/* partnership trio */
+.trio{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;margin-top:1.4rem}
+.pcard{background:#fff;border:1px solid var(--hair);border-top:3px solid var(--c);border-radius:var(--r);box-shadow:var(--s1);padding:1.15rem 1.2rem}
+.pcard .ph{display:flex;align-items:center;gap:.6rem;margin-bottom:.6rem}
+.pcard .ph b{font-size:.98rem;letter-spacing:-.01em}
+.pcard .ph .chip{width:34px;height:34px;font-size:1rem;border-radius:9px}
+.pcard ul{list-style:none}
+.pcard li{font-size:.82rem;color:var(--muted);line-height:1.5;padding:.34rem 0;border-bottom:1px solid var(--hair)}
+.pcard li:last-child{border-bottom:0;padding-bottom:0}
+.pcard li b{color:var(--ink2);font-weight:650}
+
+/* value prop groups */
+.vgroups{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;margin-top:1.3rem}
+.vgroup{display:flex;flex-direction:column;gap:.6rem}
+.vh{display:flex;align-items:center;gap:.5rem;font-size:.71rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--c);background:#fff;border:1px solid var(--hair);border-left:3px solid var(--c);border-radius:9px;padding:.5rem .7rem;box-shadow:var(--s1)}
+.vtile{background:#fff;border:1px solid var(--hair);border-radius:12px;box-shadow:var(--s1);padding:.85rem .95rem;flex:1;transition:.3s}
+.vtile:hover{box-shadow:var(--s2);transform:translateY(-3px)}
+.vtile .vt{display:flex;align-items:center;gap:.5rem;font-size:.86rem;font-weight:650;line-height:1.25}
+.vtile .vt .ico{color:var(--c);font-size:1rem}
+.vtile p{font-size:.76rem;color:var(--muted);margin-top:.35rem;line-height:1.45}
+
+/* architecture lanes */
+.lanehead{display:flex;justify-content:space-between;align-items:center;gap:1rem;flex-wrap:wrap;margin:1.15rem 0 .8rem}
+.ltitle{font-size:.7rem;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--faint);display:flex;align-items:center;gap:.45rem}
+.lane{background:#fff;border:1px solid var(--hair);border-left:4px solid var(--c);border-radius:14px;box-shadow:var(--s1);
+  padding:.72rem .95rem;margin-bottom:.55rem;transition:opacity .35s,filter .35s,box-shadow .35s,transform .35s}
+.lane.dim{opacity:.38;filter:saturate(.25)}
+.lane.up{box-shadow:var(--s2);transform:translateY(-2px)}
+.lane .lh{display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;margin-bottom:.55rem}
+.lane .lt{display:flex;align-items:center;gap:.5rem;font-size:.82rem;font-weight:700;color:var(--c)}
+.lane .lt .ico{font-size:1.02rem}
+.lane .lm{display:flex;gap:.36rem;flex-wrap:wrap}
+.pill{font-size:.66rem;font-weight:650;color:var(--muted);background:var(--paper2);border:1px solid var(--hair2);
+  border-radius:999px;padding:.2rem .58rem;white-space:nowrap}
+.pill.on{color:var(--c);background:#fff;border-color:currentColor}
+.chain{display:flex;align-items:stretch}
+.lnode{flex:1 1 0;min-width:0;display:flex;align-items:center;gap:.5rem;border:1px solid var(--hair2);border-radius:10px;
+  padding:.44rem .58rem;background:var(--paper2)}
+.lnode.acc{border-color:var(--c);background:#fff}
+.lnode .li{width:26px;height:26px;border-radius:7px;display:grid;place-items:center;font-size:.86rem;background:#fff;
+  border:1px solid var(--hair2);color:var(--ink2);flex:none}
+.lnode.acc .li{color:var(--c);border-color:currentColor}
+.lnode .lx{min-width:0}
+.lnode .ln{font-size:.76rem;font-weight:650;line-height:1.18;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lnode .ls{font-size:.66rem;color:var(--faint);line-height:1.25;margin-top:.1rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lsep{flex:0 0 20px;display:grid;place-items:center;color:var(--hair2);font-size:.86rem}
+.lsep.acc{color:var(--c)}
+
+/* steps */
+.steps{margin-top:1.4rem;display:grid;grid-template-columns:repeat(3,1fr);gap:1rem}
+.step{background:#fff;border:1px solid var(--hair);border-top:3px solid var(--c);border-radius:var(--r);box-shadow:var(--s1);padding:1.2rem}
+.step .n{display:flex;align-items:center;gap:.5rem;font-size:.68rem;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--c)}
+.step h3{font-size:1rem;margin:.6rem 0 .38rem}
+.step p{font-size:.82rem;color:var(--muted);line-height:1.5}
+.step ul{list-style:none;margin-top:.55rem}
+.step li{font-size:.76rem;color:var(--muted);line-height:1.45;padding:.15rem 0}
+.step li .ico{color:var(--c);margin-right:.45rem;vertical-align:-.12em;font-size:.82rem}
+.step li b{color:var(--ink2)}
+.cta{margin-top:1.3rem;display:flex;align-items:center;gap:1.1rem;background:linear-gradient(105deg,var(--brand2),var(--brand));
+  color:#fff;border-radius:16px;padding:1.25rem 1.5rem;box-shadow:var(--s2)}
+.cta .chip{background:rgba(255,255,255,.16);color:#fff;border-color:rgba(255,255,255,.28)}
+.cta b{display:block;font-size:.68rem;letter-spacing:.15em;text-transform:uppercase;opacity:.82;margin-bottom:.25rem}
+.cta p{font-size:clamp(.95rem,1.3vw,1.12rem);font-weight:650;line-height:1.4}
+
+/* table */
+.tblw{background:#fff;border:1px solid var(--hair);border-radius:var(--r);box-shadow:var(--s1);padding:.1rem .9rem;margin-top:.9rem}
+.tbl{width:100%;border-collapse:collapse;font-size:.755rem;table-layout:fixed}
+.tbl th{text-align:left;font-size:.63rem;letter-spacing:.12em;text-transform:uppercase;color:var(--faint);
+  padding:.44rem .5rem;border-bottom:1px solid var(--hair2);font-weight:700}
+.tbl th.az{color:var(--brand)} .tbl th.an{color:var(--clay)}
+.tbl td{padding:.3rem .5rem;border-bottom:1px solid var(--hair);vertical-align:top;line-height:1.34;color:var(--ink2)}
+.tbl tr:last-child td{border-bottom:0}
+.tbl td.k{font-weight:650;color:var(--ink)}
+.tbl td.same{background:var(--greenL);color:var(--green);font-weight:600;text-align:center;
+  border-left:1px solid #D2E8D2;border-right:1px solid #D2E8D2}
+.tbl td.same .ico{margin-right:.4rem;vertical-align:-.12em;opacity:.7}
+.tbl code{font-family:var(--m);font-size:.9em;background:var(--paper2);border:1px solid var(--hair);border-radius:5px;padding:.05rem .3rem}
+.legend{display:flex;gap:.5rem 1.3rem;flex-wrap:wrap;align-items:center;margin-top:.65rem;font-size:.73rem;color:var(--faint);line-height:1.45}
+.legend b{color:var(--ink2)}
+.legend .sw{display:inline-block;width:12px;height:12px;border-radius:4px;background:var(--greenL);border:1px solid #D2E8D2;
+  margin-right:.4rem;vertical-align:-.12em}
+a{color:var(--brand);text-decoration:none;border-bottom:1px solid #BFDCF5}
+a:hover{border-bottom-color:var(--brand)}
+
+/* links */
+.links{display:grid;grid-template-columns:repeat(2,1fr);gap:.6rem 1.2rem;margin-top:1.3rem}
+.link{display:flex;align-items:center;gap:.65rem;background:#fff;border:1px solid var(--hair);border-radius:11px;
+  padding:.62rem .8rem;box-shadow:var(--s1);transition:.28s}
+.link:hover{border-color:var(--brand);transform:translateY(-2px);box-shadow:var(--s2)}
+.link .ico{font-size:1.02rem;color:var(--brand);flex:none}
+.link .lx b{display:block;font-size:.82rem;font-weight:650;color:var(--ink)}
+.link .lx span{font-size:.7rem;color:var(--faint);font-family:var(--m)}
+
+@media (max-width:1060px){
+  .trio,.vgroups,.steps,.links{grid-template-columns:1fr}
+  .chain{flex-wrap:wrap;gap:.4rem}
+  .lsep{display:none}
+  #rail{display:none}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}.r{opacity:1;transform:none}}
+</style>
+</head>
+<body>
+
+<div id="prog"></div>
+<header id="top">
+  <div class="l"><span data-ico="microsoft"></span> Microsoft Foundry &times; <span data-ico="anthropic"></span> Anthropic</div>
+  <div class="r"><span id="secName"></span> <b><span id="secNum">01</span></b></div>
+</header>
+<nav id="rail"></nav>
+
+<div id="deck">
+
+  <!-- 1 ─ Cover ──────────────────────────────────────────────── -->
+  <section data-t="Cover"><div class="wrap">
+    <h1 class="r"><span class="wm">A\</span> on Microsoft Foundry</h1>
+    <p class="sub r" data-d="2">Developers keep the tool they already like. The organisation gets the model traffic
+      back inside its own governance, identity and billing perimeter.</p>
+  </div></section>
+
+  <!-- 2 ─ Partnership ────────────────────────────────────────── -->
+  <section class="alt" data-t="Partnership"><div class="wrap">
+    <div class="eyebrow r"><span data-ico="handshake"></span> Microsoft &times; Anthropic</div>
+    <h2 class="r" data-d="1">A multi-year agreement and partnership.</h2>
+    <p class="lede r" data-d="2">The agreement between Microsoft and Anthropic is a significant expansion of an existing
+      technical and business partnership. Claude models now surface across the Microsoft portfolio &mdash; as APIs in
+      Foundry, as a model choice in GitHub Copilot, and inside Microsoft 365.</p>
+    <div class="trio">
+      <div class="pcard r" data-d="3" style="--c:var(--brand)">
+        <div class="ph"><div class="chip"><span data-ico="ms-ai_foundry"></span></div><b>Azure &amp; Foundry</b></div>
+        <ul>
+          <li>Claude models available as <b>APIs via Foundry</b>.</li>
+          <li>Industry-leading families: <b>Opus</b>, <b>Sonnet</b>, <b>Haiku</b>.</li>
+          <li>Deeply integrated into Foundry capabilities such as <b>Agent Service</b> and <b>Model Router</b>.</li>
+        </ul>
+      </div>
+      <div class="pcard r" data-d="4" style="--c:var(--purple)">
+        <div class="ph"><div class="chip purple"><span data-ico="github"></span></div><b>GitHub Copilot</b></div>
+        <ul>
+          <li>Claude models are <b>selectable directly in GitHub Copilot</b>.</li>
+          <li>Includes the leading coding models: <b>Opus 4.6</b>, <b>Sonnet 4.5</b>, <b>Haiku 4.5</b>.</li>
+          <li>The same models your developers already reach for.</li>
+        </ul>
+      </div>
+      <div class="pcard r" data-d="5" style="--c:var(--green)">
+        <div class="ph"><div class="chip green"><span data-ico="layout-grid"></span></div><b>M365 &amp; Copilot Studio</b></div>
+        <ul>
+          <li>Claude models power the <b>Researcher agent</b>.</li>
+          <li><b>Agent Mode in Excel</b> lets users select Claude models.</li>
+          <li>Agents built in <b>Copilot Studio</b> can select Claude models.</li>
+        </ul>
+      </div>
+    </div>
+    <p class="note r" data-d="6"><span data-ico="circle-alert"></span> For both hosting options in Foundry,
+      <b>Anthropic remains the seller of record and the operator</b> of the Claude models. Claude models are
+      Non-Microsoft Products under the Product Terms, and their use is subject to the terms Anthropic provides for
+      Claude models and APIs.</p>
+  </div></section>
+
+  <!-- 3 ─ Value prop ─────────────────────────────────────────── -->
+  <section data-t="Value prop"><div class="wrap">
+    <div class="eyebrow r"><span data-ico="target"></span> Value proposition</div>
+    <h2 class="r" data-d="1">Why Anthropic <em>on Foundry</em>, rather than Anthropic alone.</h2>
+    <div class="vgroups">
+      <div class="vgroup r" data-d="2">
+        <div class="vh" style="--c:var(--brand)"><span data-ico="blocks"></span> It is about the platform</div>
+        <div class="vtile" style="--c:var(--brand)">
+          <div class="vt"><span data-ico="ms-ai_foundry"></span> Foundry integration</div>
+          <p>Integrates with Foundry services including Agent Service, Model Router and Content Safety. Extend with
+            Foundry APIs, MCP and grounding services like Bing.</p></div>
+        <div class="vtile" style="--c:var(--brand)">
+          <div class="vt"><span data-ico="plug"></span> Platform extensibility</div>
+          <p>Build end-to-end solutions with Azure services like Fabric and Cosmos DB. Accelerate agent development with
+            GitHub Copilot, then expose those agents in M365, Teams and Windows &mdash; everywhere work gets done.</p></div>
+      </div>
+      <div class="vgroup r" data-d="3">
+        <div class="vh" style="--c:var(--purple)"><span data-ico="shield-check"></span> It is about governance &amp; security</div>
+        <div class="vtile" style="--c:var(--purple)">
+          <div class="vt"><span data-ico="ms-entra_mi"></span> Identity &amp; security</div>
+          <p>Secure access with Microsoft Entra ID, Azure RBAC and Purview. Apply the policies you already run to govern
+            API usage and evidence compliance.</p></div>
+        <div class="vtile" style="--c:var(--purple)">
+          <div class="vt"><span data-ico="activity"></span> Observability &amp; management</div>
+          <p>Monitor usage, latency and cost with Azure Monitor, API Management and Foundry &mdash; alongside every other
+            Azure service, on one control plane.</p></div>
+      </div>
+      <div class="vgroup r" data-d="4">
+        <div class="vh" style="--c:var(--green)"><span data-ico="coins"></span> It is about economics</div>
+        <div class="vtile" style="--c:var(--green)">
+          <div class="vt"><span data-ico="banknote"></span> Retire existing commitments</div>
+          <p>Consolidate Anthropic model spend into your Azure MACC. Apply existing Anthropic discounts and draw down on
+            your Anthropic commits at the same time.</p></div>
+        <div class="vtile" style="--c:var(--green)">
+          <div class="vt"><span data-ico="trending-down"></span> Token efficiency</div>
+          <p>Lower model cost through intelligent retrieval and context orchestration &mdash; fewer redundant tokens,
+            better answer relevance, more value from every model call.</p></div>
+      </div>
+    </div>
+  </div></section>
+
+  <!-- 4 ─ Architecture ───────────────────────────────────────── -->
+  <section class="alt" data-t="Architecture"><div class="wrap">
+    <div class="eyebrow r"><span data-ico="workflow"></span> The architectural difference</div>
+    <h2 class="r" data-d="1">Same tools and models, three options.</h2>
+    <div class="lanehead r" data-d="2">
+      <div class="ltitle"><span data-ico="git-branch"></span> Click a route to isolate it</div>
+      <div class="seg" id="seg">
+        <button data-m="all" class="on"><span data-ico="layers"></span> Compare</button>
+        <button data-m="direct"><span data-ico="anthropic"></span> Direct</button>
+        <button data-m="azure"><span data-ico="ms-ai_foundry"></span> Foundry &middot; on Azure</button>
+        <button data-m="anthropic"><span data-ico="ms-ai_foundry"></span> Foundry &middot; on Anthropic</button>
+      </div>
+    </div>
+    <div id="lanes"></div>
+  </div></section>
+
+  <!-- 5 ─ Hosting options table ──────────────────────────────── -->
+  <section data-t="Hosting options"><div class="wrap">
+    <div class="eyebrow r"><span data-ico="scale"></span> Hosted on Azure vs hosted on Anthropic</div>
+    <h2 class="r" data-d="1">Side by side comparison.</h2>
+    <div class="tblw r" data-d="2">
+      <table class="tbl">
+        <colgroup><col style="width:19%" /><col style="width:40.5%" /><col style="width:40.5%" /></colgroup>
+        <thead><tr><th>Topic</th><th class="az">Hosted on Azure</th><th class="an">Hosted on Anthropic</th></tr></thead>
+        <tbody>
+          <tr><td class="k">Seller of record</td><td class="same" colspan="2"><span data-ico="equal"></span>Anthropic</td></tr>
+          <tr><td class="k">Data processor</td><td class="same" colspan="2"><span data-ico="equal"></span>Anthropic</td></tr>
+          <tr><td class="k">SLA</td><td class="same" colspan="2"><span data-ico="equal"></span>Anthropic is the operator and provides any SLA</td></tr>
+          <tr><td class="k">Data retention</td><td class="same" colspan="2"><span data-ico="equal"></span>Governed by Anthropic's Data Processing Addendum and Commercial Terms of Service</td></tr>
+          <tr><td class="k">Data residency</td><td>Data at rest is stored in the selected Azure geography; processing is scoped to the applicable Global or DataZone deployment option</td>
+            <td>Data might be processed outside Azure, including outside the selected Azure region</td></tr>
+          <tr><td class="k">Data zone availability</td><td>Global Standard and Data Zone Standard (US)*</td><td>Global Standard only</td></tr>
+          <tr><td class="k">Model availability</td><td>Opus 5, Opus 4.8, Sonnet 5, Haiku 4.5</td>
+            <td>The same, plus preview models (Fable) and older Opus, Sonnet and Haiku versions</td></tr>
+          <tr><td class="k">Supported APIs</td><td>Messages, token counting</td><td>Messages, token counting, plus <code>/files</code> and <code>/skills</code></td></tr>
+          <tr><td class="k">Additional capabilities</td><td>Core capability set**</td><td>Core set plus additional capabilities</td></tr>
+          <tr><td class="k">Content safety</td><td class="same" colspan="2"><span data-ico="equal"></span>Anthropic safety systems active</td></tr>
+          <tr><td class="k">Quota increase</td><td class="same" colspan="2"><span data-ico="equal"></span>Foundry quota request</td></tr>
+          <tr><td class="k">Compliance</td><td class="same" colspan="2"><span data-ico="equal"></span>Refer to the Anthropic Trust Center</td></tr>
+          <tr><td class="k">Support path</td><td class="same" colspan="2"><span data-ico="equal"></span>Microsoft Support</td></tr>
+          <tr><td class="k">Purchasing flow</td><td class="same" colspan="2"><span data-ico="equal"></span>Azure Marketplace &rarr; CCU meter; MACC-eligible</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="legend r" data-d="3">
+      <span><span class="sw"></span><b>9 of 14 dimensions are identical.</b> The real choice is residency, model breadth and API surface.</span>
+      <span>* EU Data Zone pending later in 2026.</span>
+      <span>** Parity is expanding &mdash; Structured Outputs, Web Search, Web Fetch, MCP Connector and Tool Search have landed on Azure-hosted.</span>
+      <span><a href="https://learn.microsoft.com/en-us/azure/foundry/foundry-models/concepts/claude-models-hosting-comparison">Source</a></span>
+    </div>
+  </div></section>
+
+  <!-- 6 ─ Direct vs Foundry ──────────────────────────────────── -->
+  <section class="alt" data-t="Technical delta"><div class="wrap">
+    <div class="eyebrow r"><span data-ico="git-branch"></span> Technical differences</div>
+    <h2 class="r" data-d="1">Direct API vs Foundry, for the people who have to wire it.</h2>
+    <div class="tblw r" data-d="2">
+      <table class="tbl">
+        <colgroup><col style="width:15%" /><col style="width:31%" /><col style="width:31%" /><col style="width:23%" /></colgroup>
+        <thead><tr><th>Dimension</th><th class="an">Anthropic API (direct)</th><th class="az">Foundry</th><th>Reference</th></tr></thead>
+        <tbody>
+          <tr><td class="k">Endpoint</td><td><code>api.anthropic.com/v1/messages</code></td><td><code>{resource}.services.ai.azure.com/anthropic/v1/*</code></td>
+            <td><a href="https://platform.claude.com/docs/en/build-with-claude/claude-in-microsoft-foundry">Claude in Microsoft Foundry</a></td></tr>
+          <tr><td class="k">Identity</td><td>Anthropic API key per developer or workspace</td><td>Entra ID token or Azure-issued key; Azure RBAC; optional VNet isolation</td>
+            <td><a href="https://learn.microsoft.com/en-us/azure/ai-foundry/concepts/rbac-azure-ai-foundry">Foundry RBAC</a></td></tr>
+          <tr><td class="k">Model name</td><td>Model ID, e.g. <code>claude-opus-5</code></td><td>Your <em>deployment</em> name &mdash; defaults to the model ID, customisable per config or rate limit</td>
+            <td><a href="https://platform.claude.com/docs/en/build-with-claude/claude-in-microsoft-foundry">Model IDs &amp; deployments</a></td></tr>
+          <tr><td class="k">Claude Code</td><td>Default provider</td><td><code>CLAUDE_CODE_USE_FOUNDRY=1</code> plus <code>ANTHROPIC_FOUNDRY_RESOURCE</code>; <code>az login</code> covers auth</td>
+            <td><a href="https://code.claude.com/docs/en/microsoft-foundry">Claude Code on Foundry</a></td></tr>
+          <tr><td class="k">SDKs</td><td>All Anthropic SDKs</td><td>C#, Java, PHP, Python, TypeScript have Foundry clients; Go and Ruby need a base-URL workaround</td>
+            <td><a href="https://platform.claude.com/docs/en/cli-sdks-libraries/overview">SDK overview</a></td></tr>
+          <tr><td class="k">Not available</td><td>&mdash;</td><td>Admin API, Compliance API, Models API, Message Batches API, server-side fallback</td>
+            <td><a href="https://platform.claude.com/docs/en/build-with-claude/claude-in-microsoft-foundry">Feature support</a></td></tr>
+          <tr><td class="k">Model pinning</td><td>Alias resolves server-side</td><td>No startup model check &mdash; pin <code>ANTHROPIC_DEFAULT_*_MODEL</code> or an unpinned alias can simply fail</td>
+            <td><a href="https://code.claude.com/docs/en/model-config">Model configuration</a></td></tr>
+          <tr><td class="k">Rate limits</td><td>Anthropic rate-limit response headers</td><td>Headers not returned &mdash; manage through Azure monitoring; increases via Azure support</td>
+            <td><a href="https://learn.microsoft.com/en-us/azure/ai-foundry/foundry-models/quotas-limits">Quotas &amp; limits</a></td></tr>
+          <tr><td class="k">Billing</td><td>Anthropic invoice or card</td><td>Claude Consumption Units through Azure Marketplace, on the Azure invoice</td>
+            <td><a href="https://platform.claude.com/docs/en/about-claude/pricing">Pricing</a></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="note r" data-d="3"><span data-ico="check"></span> Response bodies, the <code>usage</code> object and the
+      <code>anthropic-version</code> header behave identically. Foundry adds <code>request-id</code> and
+      <code>apim-request-id</code> correlation headers &mdash; quote both when raising support.</p>
+  </div></section>
+
+  <!-- 7 ─ Next steps ─────────────────────────────────────────── -->
+  <section data-t="Next steps"><div class="wrap">
+    <div class="eyebrow r"><span data-ico="rocket"></span> Proposed path</div>
+    <h2 class="r" data-d="1">Prove the experience, then scale.</h2>
+    <div class="steps">
+      <div class="step r" data-d="2" style="--c:var(--brand)"><div class="n"><span data-ico="monitor-play"></span> Step 1 &middot; Demo</div>
+        <h3>See it from the developer's seat</h3>
+        <p>A live session against a Foundry endpoint: the same tooling, Entra sign-in, a real repository.</p>
+        <ul><li><span data-ico="check"></span><b>~60 minutes</b>, your engineers watching</li>
+          <li><span data-ico="check"></span>Side by side with the direct setup</li>
+          <li><span data-ico="check"></span>Output: a go/no-go on the experience</li></ul></div>
+      <div class="step r" data-d="3" style="--c:var(--purple)"><div class="n"><span data-ico="flask-conical"></span> Step 2 &middot; POC</div>
+        <h3>One dev team, instrumented</h3>
+        <p>Foundry resource, pinned deployments, RBAC, monitoring and a measured baseline.</p>
+        <ul><li><span data-ico="check"></span><b>1&ndash;2 weeks</b>, one team</li>
+          <li><span data-ico="check"></span>Cost per developer and usage telemetry</li>
+          <li><span data-ico="check"></span>Output: real unit economics, not a quote</li></ul></div>
+      <div class="step r" data-d="4" style="--c:var(--green)"><div class="n"><span data-ico="users-round"></span> Step 3 &middot; Scale</div>
+        <h3>Roll out to the wider population</h3>
+        <p>Managed settings, org-wide context files, quotas and chargeback per team.</p>
+        <ul><li><span data-ico="check"></span>One-click install for your dev environment</li>
+          <li><span data-ico="check"></span>Gateway policies for budget control</li>
+          <li><span data-ico="check"></span>Output: governed, forecastable consumption</li></ul></div>
+    </div>
+    <div class="cta r" data-d="5"><div class="chip"><span data-ico="user-check"></span></div>
+      <div><b>What we bring &mdash; and what we need</b>
+        <p>Microsoft provides the setup support at every step: resource design, RBAC, deployment pinning, gateway and cost
+        controls. We need a named engineering sponsor and one team willing to be measured.</p></div></div>
+  </div></section>
+
+  <!-- 8 ─ Sources ────────────────────────────────────────────── -->
+  <section class="alt" data-t="Sources"><div class="wrap">
+    <div class="eyebrow r"><span data-ico="book-open"></span> Documentation</div>
+    <h2 class="r" data-d="1">Everything in this brief, from the source.</h2>
+    <div class="links">
+      <a class="link r" data-d="2" href="https://learn.microsoft.com/en-us/azure/foundry/foundry-models/concepts/claude-models-hosting-comparison"><span data-ico="scale"></span>
+        <div class="lx"><b>Claude models &mdash; hosting comparison</b><span>learn.microsoft.com/.../claude-models-hosting-comparison</span></div></a>
+      <a class="link r" data-d="2" href="https://platform.claude.com/docs/en/build-with-claude/claude-in-microsoft-foundry"><span data-ico="anthropic"></span>
+        <div class="lx"><b>Claude in Microsoft Foundry &mdash; hosting, auth, features</b><span>platform.claude.com/docs/.../claude-in-microsoft-foundry</span></div></a>
+      <a class="link r" data-d="3" href="https://code.claude.com/docs/en/microsoft-foundry"><span data-ico="terminal"></span>
+        <div class="lx"><b>Claude Code on Microsoft Foundry</b><span>code.claude.com/docs/en/microsoft-foundry</span></div></a>
+      <a class="link r" data-d="3" href="https://code.claude.com/docs/en/third-party-integrations"><span data-ico="layers"></span>
+        <div class="lx"><b>Enterprise deployment options compared</b><span>code.claude.com/docs/en/third-party-integrations</span></div></a>
+      <a class="link r" data-d="4" href="https://code.claude.com/docs/en/llm-gateway"><span data-ico="plug"></span>
+        <div class="lx"><b>LLM gateways and corporate proxies</b><span>code.claude.com/docs/en/llm-gateway</span></div></a>
+      <a class="link r" data-d="4" href="https://platform.claude.com/docs/en/about-claude/pricing"><span data-ico="wallet"></span>
+        <div class="lx"><b>Claude pricing, incl. Foundry CCU mechanics</b><span>platform.claude.com/docs/en/about-claude/pricing</span></div></a>
+      <a class="link r" data-d="5" href="https://learn.microsoft.com/en-us/marketplace/azure-consumption-commitment-benefit"><span data-ico="banknote"></span>
+        <div class="lx"><b>Azure Consumption Commitment benefit (MACC)</b><span>learn.microsoft.com/marketplace/azure-consumption-commitment-benefit</span></div></a>
+      <a class="link r" data-d="5" href="https://learn.microsoft.com/en-us/azure/ai-foundry/concepts/rbac-azure-ai-foundry"><span data-ico="ms-entra_mi"></span>
+        <div class="lx"><b>Microsoft Foundry RBAC</b><span>learn.microsoft.com/azure/ai-foundry/concepts/rbac-azure-ai-foundry</span></div></a>
+    </div>
+    <p class="note r" data-d="6"><span data-ico="circle-alert"></span> Model IDs and capability lists move fast.
+      Confirm the live catalogue at <a href="https://ai.azure.com/catalog/publishers/anthropic">ai.azure.com/catalog/publishers/anthropic</a>
+      before pinning deployments, and confirm MACC eligibility against the customer's agreement.</p>
+  </div></section>
+
+</div>
+
+<script>
+const ICO = {"laptop":"<svg class=\"ico\" class=\"lucide lucide-laptop\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <path d=\"M18 5a2 2 0 0 1 2 2v8.526a2 2 0 0 0 .212.897l1.068 2.127a1 1 0 0 1-.9 1.45H3.62a1 1 0 0 1-.9-1.45l1.068-2.127A2 2 0 0 0 4 15.526V7a2 2 0 0 1 2-2z\" /> <path d=\"M20.054 15.987H3.946\" /> </svg>","terminal":"<svg class=\"ico\" class=\"lucide lucide-terminal\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <path d=\"M12 19h8\" /> <path d=\"m4 17 6-6-6-6\" /> </svg>","key-round":"<svg class=\"ico\" class=\"lucide lucide-key-round\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <path d=\"M2.586 17.414A2 2 0 0 0 2 18.828V21a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h1a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h.172a2 2 0 0 0 1.414-.586l.814-.814a6.5 6.5 0 1 0-4-4z\" /> <circle cx=\"16.5\" cy=\"7.5\" r=\".5\" fill=\"currentColor\" /> </svg>","shield-check":"<svg class=\"ico\" class=\"lucide lucide-shield-check\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <path d=\"M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z\" /> <path d=\"m9 12 2 2 4-4\" /> </svg>","server":"<svg class=\"ico\" class=\"lucide lucide-server\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <rect x=\"2\" y=\"2\" rx=\"2\" ry=\"2\" /> <rect x=\"2\" y=\"14\" rx=\"2\" ry=\"2\" /> <line x1=\"6\" x2=\"6.01\" y1=\"6\" y2=\"6\" /> <line x1=\"6\" x2=\"6.01\" y1=\"18\" y2=\"18\" /> </svg>","globe":"<svg class=\"ico\" class=\"lucide lucide-globe\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <circle cx=\"12\" cy=\"12\" r=\"10\" /> <path d=\"M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20\" /> <path d=\"M2 12h20\" /> </svg>","users-round":"<svg class=\"ico\" class=\"lucide lucide-users-round\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <path d=\"M18 21a8 8 0 0 0-16 0\" /> <circle cx=\"10\" cy=\"8\" r=\"5\" /> <path d=\"M22 20c0-3.37-2-6.5-4-8a5 5 0 0 0-.45-8.3\" /> </svg>","user-check":"<svg class=\"ico\" class=\"lucide lucide-user-check\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <path d=\"m16 11 2 2 4-4\" /> <path d=\"M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2\" /> <circle cx=\"9\" cy=\"7\" r=\"4\" /> </svg>","circle-alert":"<svg class=\"ico\" class=\"lucide lucide-circle-alert\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <circle cx=\"12\" cy=\"12\" r=\"10\" /> <line x1=\"12\" x2=\"12\" y1=\"8\" y2=\"12\" /> <line x1=\"12\" x2=\"12.01\" y1=\"16\" y2=\"16\" /> </svg>","chevron-right":"<svg class=\"ico\" class=\"lucide lucide-chevron-right\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <path d=\"m9 18 6-6-6-6\" /> </svg>","circle-dot":"<svg class=\"ico\" class=\"lucide lucide-circle-dot\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <circle cx=\"12\" cy=\"12\" r=\"1\" /> <circle cx=\"12\" cy=\"12\" r=\"10\" /> </svg>","equal":"<svg class=\"ico\" class=\"lucide lucide-equal\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <line x1=\"5\" x2=\"19\" y1=\"9\" y2=\"9\" /> <line x1=\"5\" x2=\"19\" y1=\"15\" y2=\"15\" /> </svg>","handshake":"<svg class=\"ico\" class=\"lucide lucide-handshake\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <path d=\"m11 17 2 2a1 1 0 1 0 3-3\" /> <path d=\"m14 14 2.5 2.5a1 1 0 1 0 3-3l-3.88-3.88a3 3 0 0 0-4.24 0l-.88.88a1 1 0 1 1-3-3l2.81-2.81a5.79 5.79 0 0 1 7.06-.87l.47.28a2 2 0 0 0 1.42.25L21 4\" /> <path d=\"m21 3 1 11h-2\" /> <path d=\"M3 3 2 14l6.5 6.5a1 1 0 1 0 3-3\" /> <path d=\"M3 4h8\" /> </svg>","github":"<svg class=\"ico\" class=\"lucide lucide-git-branch\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <path d=\"M15 6a9 9 0 0 0-9 9V3\" /> <circle cx=\"18\" cy=\"6\" r=\"3\" /> <circle cx=\"6\" cy=\"18\" r=\"3\" /> </svg>","layout-grid":"<svg class=\"ico\" class=\"lucide lucide-layout-grid\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <rect x=\"3\" y=\"3\" rx=\"1\" /> <rect x=\"14\" y=\"3\" rx=\"1\" /> <rect x=\"14\" y=\"14\" rx=\"1\" /> <rect x=\"3\" y=\"14\" rx=\"1\" /> </svg>","blocks":"<svg class=\"ico\" class=\"lucide lucide-blocks\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <path d=\"M10 22V7a1 1 0 0 0-1-1H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-5a1 1 0 0 0-1-1H2\" /> <rect x=\"14\" y=\"2\" rx=\"1\" /> </svg>","coins":"<svg class=\"ico\" class=\"lucide lucide-coins\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <path d=\"M13.744 17.736a6 6 0 1 1-7.48-7.48\" /> <path d=\"M15 6h1v4\" /> <path d=\"m6.134 14.768.866-.5 2 3.464\" /> <circle cx=\"16\" cy=\"8\" r=\"6\" /> </svg>","workflow":"<svg class=\"ico\" class=\"lucide lucide-workflow\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <rect x=\"3\" y=\"3\" rx=\"2\" /> <path d=\"M7 11v4a2 2 0 0 0 2 2h4\" /> <rect x=\"13\" y=\"13\" rx=\"2\" /> </svg>","git-branch":"<svg class=\"ico\" class=\"lucide lucide-git-branch\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <path d=\"M15 6a9 9 0 0 0-9 9V3\" /> <circle cx=\"18\" cy=\"6\" r=\"3\" /> <circle cx=\"6\" cy=\"18\" r=\"3\" /> </svg>","layers":"<svg class=\"ico\" class=\"lucide lucide-layers\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <path d=\"M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z\" /> <path d=\"M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12\" /> <path d=\"M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17\" /> </svg>","plug":"<svg class=\"ico\" class=\"lucide lucide-plug\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <path d=\"M12 22v-5\" /> <path d=\"M15 8V2\" /> <path d=\"M17 8a1 1 0 0 1 1 1v4a4 4 0 0 1-4 4h-4a4 4 0 0 1-4-4V9a1 1 0 0 1 1-1z\" /> <path d=\"M9 8V2\" /> </svg>","check":"<svg class=\"ico\" class=\"lucide lucide-check\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <path d=\"M20 6 9 17l-5-5\" /> </svg>","activity":"<svg class=\"ico\" class=\"lucide lucide-activity\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <path d=\"M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2\" /> </svg>","banknote":"<svg class=\"ico\" class=\"lucide lucide-banknote\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <rect x=\"2\" y=\"6\" rx=\"2\" /> <circle cx=\"12\" cy=\"12\" r=\"2\" /> <path d=\"M6 12h.01M18 12h.01\" /> </svg>","wallet":"<svg class=\"ico\" class=\"lucide lucide-wallet\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <path d=\"M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1\" /> <path d=\"M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4\" /> </svg>","target":"<svg class=\"ico\" class=\"lucide lucide-target\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <circle cx=\"12\" cy=\"12\" r=\"10\" /> <circle cx=\"12\" cy=\"12\" r=\"6\" /> <circle cx=\"12\" cy=\"12\" r=\"2\" /> </svg>","trending-down":"<svg class=\"ico\" class=\"lucide lucide-trending-down\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <path d=\"M16 17h6v-6\" /> <path d=\"m22 17-8.5-8.5-5 5L2 7\" /> </svg>","scale":"<svg class=\"ico\" class=\"lucide lucide-scale\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <path d=\"M12 3v18\" /> <path d=\"m19 8 3 8a5 5 0 0 1-6 0zV7\" /> <path d=\"M3 7h1a17 17 0 0 0 8-2 17 17 0 0 0 8 2h1\" /> <path d=\"m5 8 3 8a5 5 0 0 1-6 0zV7\" /> <path d=\"M7 21h10\" /> </svg>","book-open":"<svg class=\"ico\" class=\"lucide lucide-book-open\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <path d=\"M12 5v16\" /> <path d=\"M20.001 19A2 2 0 0022 17V5a2 2 0 00-1.999-2L16 3.002A5 5 0 0012 5a5 5 0 00-4-2H4a2 2 0 00-2 2v12a2 2 0 001.999 2H8a5 5 0 014 2 5 5 0 014-2z\" /> </svg>","rocket":"<svg class=\"ico\" class=\"lucide lucide-rocket\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <path d=\"M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5\" /> <path d=\"M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09\" /> <path d=\"M9 12a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.4 22.4 0 0 1-4 2z\" /> <path d=\"M9 12H4s.55-3.03 2-4c1.62-1.08 5 .05 5 .05\" /> </svg>","flask-conical":"<svg class=\"ico\" class=\"lucide lucide-flask-conical\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <path d=\"M14 2v6a2 2 0 0 0 .245.96l5.51 10.08A2 2 0 0 1 18 22H6a2 2 0 0 1-1.755-2.96l5.51-10.08A2 2 0 0 0 10 8V2\" /> <path d=\"M6.453 15h11.094\" /> <path d=\"M8.5 2h7\" /> </svg>","monitor-play":"<svg class=\"ico\" class=\"lucide lucide-monitor-play\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <path d=\"M15.033 9.44a.647.647 0 0 1 0 1.12l-4.065 2.352a.645.645 0 0 1-.968-.56V7.648a.645.645 0 0 1 .967-.56z\" /> <path d=\"M12 17v4\" /> <path d=\"M8 21h8\" /> <rect x=\"2\" y=\"3\" rx=\"2\" /> </svg>","anthropic":"<svg class=\"ico\" fill=\"currentColor\" role=\"img\" viewBox=\"0 0 24 24\" xmlns=\"http://www.w3.org/2000/svg\"><path d=\"M17.3041 3.541h-3.6718l6.696 16.918H24Zm-10.6082 0L0 20.459h3.7442l1.3693-3.5527h7.0052l1.3693 3.5528h3.7442L10.5363 3.5409Zm-.3712 10.2232 2.2914-5.9456 2.2914 5.9456Z\"/></svg>","ms-ai_foundry":"<svg class=\"ico ico-brand\" id=\"uuid-62050117-635e-42ed-902b-2ba2efd9a722\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 18 18\"><defs><linearGradient id=\"uuid-5a7bd7fa-6937-44bd-a5ba-e23eddbb6d35\" x1=\"10.91\" y1=\"13.66\" x2=\"13.62\" y2=\"13.66\" gradientTransform=\"translate(0 20) scale(1 -1)\" gradientUnits=\"userSpaceOnUse\"><stop offset=\"0\" stop-color=\"#302ec9\" /><stop offset=\".12\" stop-color=\"#151698\" /><stop offset=\".25\" stop-color=\"#0a0b7e\" /><stop offset=\".43\" stop-color=\"#090c7f\" /><stop offset=\".51\" stop-color=\"#141698\" /><stop offset=\".61\" stop-color=\"#282ac4\" /><stop offset=\".77\" stop-color=\"#8e8ff4\" /><stop offset=\".85\" stop-color=\"#a7a6f7\" /><stop offset=\".91\" stop-color=\"#cacafb\" /><stop offset=\"1\" stop-color=\"#fff\" /></linearGradient><linearGradient id=\"uuid-a9b2ac78-bff0-475d-89df-2c97f2122f93\" x1=\"12.26\" y1=\"8.32\" x2=\"12.26\" y2=\"18.23\" gradientTransform=\"translate(0 20) scale(1 -1)\" gradientUnits=\"userSpaceOnUse\"><stop offset=\".02\" stop-color=\"#201ba6\" /><stop offset=\".64\" stop-color=\"#2d29c7\" /><stop offset=\"1\" stop-color=\"#201ba6\" /></linearGradient><linearGradient id=\"uuid-03b3b70c-1c8d-4b3f-9935-d9da2b20de2f\" x1=\"14.19\" y1=\"8.27\" x2=\"14.19\" y2=\"14.47\" gradientTransform=\"translate(0 20) scale(1 -1)\" gradientUnits=\"userSpaceOnUse\"><stop offset=\"0\" stop-color=\"#3530c3\" /><stop offset=\".5\" stop-color=\"#6d71d1\" /><stop offset=\".97\" stop-color=\"#c0bff5\" /><stop offset=\"1\" stop-color=\"#e3e4ff\" /></linearGradient><linearGradient id=\"uuid-cabc8ec9-3293-44b8-a33b-70823f583b30\" x1=\"6.51\" y1=\"3\" x2=\"6.51\" y2=\"19.15\" gradientTransform=\"translate(0 20) scale(1 -1)\" gradientUnits=\"userSpaceOnUse\"><stop offset=\"0\" stop-color=\"#302ec9\" /><stop offset=\".45\" stop-color=\"#302ec9\" /><stop offset=\".95\" stop-color=\"#cacafb\" /><stop offset=\"1\" stop-color=\"#7f7eaf\" /></linearGradient></defs><path d=\"M11.96,11.68s.07-.1.07-.24v-3.87c0-.85.66-1.76,1.59-2.03-.06-.19-.64-2.11-.81-2.65-.17-.56-.67-1.9-1.29-1.9,0,0,0,0-.01,0h0s-.09.05-.13.13c-.32.58-.46,3.02-.46,4.84v2.26c.27.97.91,3.22.96,3.35,0,0,.05.1.09.1h0Z\" fill=\"url(#uuid-5a7bd7fa-6937-44bd-a5ba-e23eddbb6d35)\" /><path d=\"M11.96,11.68s.07-.1.07-.24v-3.87c0-.85.66-1.76,1.59-2.03-.06-.19-.64-2.11-.81-2.65-.17-.56-.67-1.9-1.29-1.9,0,0,0,0-.01,0h0s-.09.05-.13.13c-.32.58-.46,3.02-.46,4.84v2.26c.27.97.91,3.22.96,3.35,0,0,.05.1.09.1h0Z\" fill=\"url(#uuid-a9b2ac78-bff0-475d-89df-2c97f2122f93)\" /><path d=\"M16.01,5.46h-1.81c-1.21,0-2.17,1.09-2.17,2.11v3.87c0,.14-.04.24-.07.24s-.09-.1-.09-.1c0,0,.07.21.17.21h1.98c.62,0,2.48-.61,2.48-2.52v-3.25c0-.41-.24-.55-.49-.55Z\" fill=\"url(#uuid-03b3b70c-1c8d-4b3f-9935-d9da2b20de2f)\" /><path d=\"M2.34,17h5.38c2.35,0,3.2-2.03,3.2-3.81v-7.23c0-2.08.19-4.97.61-4.97h-3.23c-.77,0-1.43.82-2.18,2.48-.75,1.66-4.36,11.87-4.52,12.36-.26.79-.02,1.16.74,1.16Z\" fill=\"url(#uuid-cabc8ec9-3293-44b8-a33b-70823f583b30)\" /></svg>","ms-entra_mi":"<svg class=\"ico ico-brand\" id=\"uuid-fdd7680e-8ace-441a-8a3a-73410c3b1f21\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 18 18\"><defs><linearGradient id=\"uuid-38c07977-ab9a-48eb-a668-cda3102bbd85\" x1=\"7.697\" y1=\"779.168\" x2=\"14.082\" y2=\"786.631\" gradientTransform=\"translate(0 791.516) scale(1 -1)\" gradientUnits=\"userSpaceOnUse\"><stop offset=\"0\" stop-color=\"#225086\" /><stop offset=\"1\" stop-color=\"#0055c5\" /></linearGradient><linearGradient id=\"uuid-aed4a7bc-b380-4c34-b841-2d0f34d24f17\" x1=\"6.364\" y1=\"778.164\" x2=\"6.364\" y2=\"794.412\" gradientTransform=\"translate(0 791.516) scale(1 -1)\" gradientUnits=\"userSpaceOnUse\"><stop offset=\"0\" stop-color=\"#6df\" /><stop offset=\"1\" stop-color=\"#0294e4\" /></linearGradient><linearGradient id=\"uuid-e2a7b7f2-bf16-4a76-ba27-7d149ab8a194\" x1=\"9.001\" y1=\"775.956\" x2=\"9.001\" y2=\"794.845\" gradientTransform=\"translate(0 791.516) scale(1 -1)\" gradientUnits=\"userSpaceOnUse\"><stop offset=\"0\" stop-color=\"#44dbf9\" /><stop offset=\"1\" stop-color=\"#cbf8ff\" /></linearGradient><linearGradient id=\"uuid-c67f3364-071c-41f9-a175-d3de1f837e0a\" x1=\"13.5\" y1=\"774.721\" x2=\"13.5\" y2=\"790.782\" gradientTransform=\"translate(0 791.516) scale(1 -1)\" gradientUnits=\"userSpaceOnUse\"><stop offset=\"0\" stop-color=\"#041642\" /><stop offset=\"1\" stop-color=\"#041642\" stop-opacity=\".25\" /></linearGradient></defs><g><path d=\"m17.647,9.906L10.147,1.445c-.599-.676-1.694-.676-2.294,0L.353,9.906c-.579.654-.428,1.641.323,2.111l7.499,4.688c.5.313,1.148.313,1.648,0l7.499-4.688c.751-.469.902-1.457.323-2.111h0Z\" fill=\"url(#uuid-38c07977-ab9a-48eb-a668-cda3102bbd85)\" stroke-width=\"0\" /><path d=\"m10.148,1.445c-.599-.676-1.694-.676-2.294,0L.354,9.906c-.579.654-.428,1.641.323,2.111,0,0,2.776,1.735,3.126,1.954.388.242,1.033.511,1.715.511.621,0,1.197-.18,1.676-.487,0,0,0,0,.002-.001l1.804-1.128-4.364-2.728,4.474-5.047c.55-.627,1.377-1.026,2.302-1.026.472,0,.917.107,1.314.292l-2.579-2.909v-.002Z\" fill=\"url(#uuid-aed4a7bc-b380-4c34-b841-2d0f34d24f17)\" stroke-width=\"0\" /><polygon points=\"4.636 10.138 4.688 10.17 9.001 12.866 9.001 12.866 13.365 10.138 13.366 10.138 13.365 10.138 9.001 5.214 4.636 10.138\" fill=\"url(#uuid-e2a7b7f2-bf16-4a76-ba27-7d149ab8a194)\" stroke-width=\"0\" /><path d=\"m9.001,16.939c.287,0,.574-.078.824-.234l7.499-4.688c.751-.469.902-1.457.323-2.111L10.148,1.445c-.3-.338-.723-.507-1.147-.507v16.001Z\" fill=\"url(#uuid-c67f3364-071c-41f9-a175-d3de1f837e0a)\" fill-opacity=\".5\" isolation=\"isolate\" opacity=\".5\" stroke-width=\"0\" /></g><g><path id=\"uuid-f6648d86-048a-4f40-a6df-7ce120116a98\" d=\"m16.512,10.831c.464-.458.468-1.206.01-1.67-.003-.003-.006-.006-.01-.01h0l-2.035-2.035c-.461-.461-1.208-.461-1.669,0h0l-2.035,2.035c-.456.467-.456,1.213,0,1.679l1.7,1.7c.061.063.094.147.092.234v3.155c-.003.108.041.213.122.285l.773.773c.095.104.255.112.359.017.006-.005.012-.011.017-.017l.743-.743h0l.448-.448c.058-.059.058-.154,0-.214l-.316-.315c-.067-.059-.074-.162-.014-.23.005-.005.009-.01.014-.014l.316-.316c.059-.063.059-.161,0-.224l-.316-.316c-.065-.054-.073-.15-.019-.215.006-.007.012-.013.019-.019l.316-.326c.058-.059.058-.154,0-.214l-.448-.448v-.163l1.934-1.944Zm-2.87-3.226c.371,0,.672.301.672.672s-.301.672-.672.672-.672-.301-.672-.672h0c0-.371.301-.672.672-.672Z\" fill=\"#ffca00\" stroke-width=\"0\" /><path id=\"uuid-e1697bf4-8e5d-4d62-90c9-6569d79d4944\" d=\"m13.133,16.042h0c.055.057.145.058.201.003.031-.03.047-.072.043-.115v-2.605c.002-.051-.021-.1-.061-.132h0c-.064-.045-.153-.03-.199.034-.02.029-.029.064-.025.098v2.555c-.02.058-.004.122.041.163Z\" fill=\"#ff9300\" isolation=\"isolate\" opacity=\".75\" stroke-width=\"0\" /><rect id=\"uuid-c930d4c2-9f41-48c7-adf7-acbd73af6fbf\" x=\"12.014\" y=\"9.834\" rx=\".183\" ry=\".183\" fill=\"#ff9300\" isolation=\"isolate\" opacity=\".75\" stroke-width=\"0\" /><rect id=\"uuid-755aaa46-8b89-45f5-9da0-8a42782c5ddd\" x=\"12.014\" y=\"10.475\" rx=\".183\" ry=\".183\" fill=\"#ff9300\" isolation=\"isolate\" opacity=\".75\" stroke-width=\"0\" /></g></svg>","microsoft":"<svg class=\"ico ico-brand\" viewBox=\"0 0 23 23\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"1\" y=\"1\" width=\"10\" height=\"10\" fill=\"#F25022\"/><rect x=\"12\" y=\"1\" width=\"10\" height=\"10\" fill=\"#7FBA00\"/><rect x=\"1\" y=\"12\" width=\"10\" height=\"10\" fill=\"#00A4EF\"/><rect x=\"12\" y=\"12\" width=\"10\" height=\"10\" fill=\"#FFB900\"/></svg>"};
+document.querySelectorAll('[data-ico]').forEach(e => { e.innerHTML = ICO[e.dataset.ico] || ''; });
+
+/* ---- architecture: three routes, one DOM ---- */
+const LANES = [
+  { id:'direct', c:'var(--clay)', title:'Today \u2014 direct to Anthropic',
+    meta:['Anthropic account','Anthropic invoice','No Azure telemetry'],
+    n:[ {i:'laptop',   t:'Dev laptop',        s:'Claude Code CLI'},
+        {i:'key-round',t:'Personal API key',  s:'ANTHROPIC_API_KEY'},
+        {i:'globe',    t:'api.anthropic.com', s:'Public internet'},
+        {i:'anthropic',t:'Claude models',     s:'Anthropic infrastructure', a:true} ] },
+  { id:'azure', c:'var(--brand)', title:'Foundry \u2014 hosted on Azure',
+    meta:['Entra ID + RBAC','Azure invoice \u00b7 CCU','Azure Monitor'],
+    n:[ {i:'laptop',       t:'Dev laptop',        s:'CLAUDE_CODE_USE_FOUNDRY=1'},
+        {i:'ms-entra_mi',  t:'Entra ID token',    s:'No key to distribute', a:true},
+        {i:'ms-ai_foundry',t:'Foundry resource',  s:'{resource}.services.ai.azure.com', a:true},
+        {i:'server',       t:'Claude models',     s:'Anthropic service, on Azure', a:true} ] },
+  { id:'anthropic', c:'var(--purple)', title:'Foundry \u2014 hosted on Anthropic',
+    meta:['Entra ID + RBAC','Azure invoice \u00b7 CCU','Azure Monitor'],
+    n:[ {i:'laptop',       t:'Dev laptop',       s:'CLAUDE_CODE_USE_FOUNDRY=1'},
+        {i:'ms-entra_mi',  t:'Entra ID token',   s:'No key to distribute', a:true},
+        {i:'ms-ai_foundry',t:'Foundry resource', s:'Same endpoint, same bill', a:true},
+        {i:'anthropic',    t:'Claude models',    s:'Anthropic infrastructure', a:true} ] }
+];
+const laneWrap = document.getElementById('lanes');
+LANES.forEach(L => {
+  const el = document.createElement('div');
+  el.className = 'lane'; el.style.setProperty('--c', L.c); el.dataset.id = L.id;
+  const chain = L.n.map((n, i) =>
+    (i ? '<div class="lsep' + (n.a ? ' acc' : '') + '">' + (ICO['chevron-right'] || '') + '</div>' : '') +
+    '<div class="lnode' + (n.a ? ' acc' : '') + '"><div class="li">' + (ICO[n.i] || '') + '</div>' +
+    '<div class="lx"><div class="ln">' + n.t + '</div><div class="ls">' + n.s + '</div></div></div>'
+  ).join('');
+  el.innerHTML =
+    '<div class="lh"><div class="lt">' + (ICO['circle-dot'] || '') + L.title + '</div>' +
+    '<div class="lm">' + L.meta.map(m => '<span class="pill">' + m + '</span>').join('') + '</div></div>' +
+    '<div class="chain">' + chain + '</div>';
+  laneWrap.appendChild(el);
+});
+const laneEls = [...laneWrap.children];
+const segBtns = [...document.querySelectorAll('#seg button')];
+function setMode(m){
+  laneEls.forEach(el => {
+    const on = m === 'all' || el.dataset.id === m;
+    el.classList.toggle('dim', !on);
+    el.classList.toggle('up', m !== 'all' && on);
+    el.querySelectorAll('.pill').forEach(p => p.classList.toggle('on', m !== 'all' && on));
+  });
+  segBtns.forEach(b => b.classList.toggle('on', b.dataset.m === m));
+}
+segBtns.forEach(b => b.onclick = () => setMode(b.dataset.m));
+setMode('all');
+
+/* ---- nav + reveal ---- */
+const deck = document.getElementById('deck');
+const secs = [...document.querySelectorAll('section')];
+const rail = document.getElementById('rail');
+secs.forEach(s => { const b = document.createElement('button');
+  b.innerHTML = '<span>' + s.dataset.t + '</span>'; b.onclick = () => s.scrollIntoView(); rail.appendChild(b); });
+const dots = [...rail.children];
+// Scroll-driven rather than IntersectionObserver: a programmatic jump must reveal content too.
+let last = -1;
+function cur(){ return Math.max(0, Math.min(secs.length - 1, Math.round(deck.scrollTop / deck.clientHeight))); }
+function sync(){
+  const i = cur();
+  const max = deck.scrollHeight - deck.clientHeight;
+  document.getElementById('prog').style.width = (max ? deck.scrollTop / max * 100 : 0) + '%';
+  if (i === last) return;
+  last = i;
+  secs[i].classList.add('is-in');
+  dots.forEach((d, j) => d.classList.toggle('on', j === i));
+  document.getElementById('secName').textContent = secs[i].dataset.t;
+  document.getElementById('secNum').textContent = String(i + 1).padStart(2, '0');
+}
+deck.addEventListener('scroll', sync, { passive:true });
+addEventListener('resize', sync);
+setInterval(sync, 250);   // safety net: some embedded viewers never dispatch scroll events
+function go(d){ secs[Math.max(0, Math.min(secs.length - 1, cur() + d))].scrollIntoView(); }
+addEventListener('keydown', e => {
+  if (['ArrowDown','PageDown',' ','ArrowRight'].includes(e.key)) { e.preventDefault(); go(1); }
+  if (['ArrowUp','PageUp','ArrowLeft'].includes(e.key)) { e.preventDefault(); go(-1); }
+});
+sync();
+</script>
+</body>
+</html>
